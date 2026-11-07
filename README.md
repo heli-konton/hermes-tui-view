@@ -12,10 +12,15 @@ for Hermes.
   **SSH gateway**, so a remote session resumes on the host that owns it.
 - Toggling back collapses the terminal pane to its rail; the TUI keeps running.
   Toggle again and you are back in it (no second `hermes` is spawned for the
-  same session) — unless the chat view completed a turn meanwhile, in which
-  case the TUI tab is restarted so it resumes with those turns. (The TUI
-  process reads the transcript once at start; TUI → chat syncs live, chat →
-  TUI needs this restart until the TUI can attach to the running gateway.)
+  same session).
+- **Sync is one-way for now:** turns typed in the TUI appear live in the chat;
+  a turn sent from the chat is *not* visible in a running TUI (the TUI reads
+  the transcript once, and Hermes' one-owner session lease refuses a second
+  runtime). The plugin tells you when that happened. Rule of thumb: finish a
+  thread in the view you started it in. The real fix is the runtime half of
+  Hermes' cooperative attach (`shared_runtime_url` + `/api/session-attach`),
+  which lets the TUI join the running session — tracked as the follow-up to
+  the SDK PR.
 - An unsent draft in the composer is copied to the clipboard when you switch,
   so it comes with you — paste it into the TUI.
 - ⌘K: *TUI View: toggle chat ⇄ TUI*, *TUI View: back to chat*.

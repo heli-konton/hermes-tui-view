@@ -71,13 +71,18 @@ function switchToTui(ctx) {
   }
 
   if (openedTabs.has(sessionId)) {
-    // Chat moved on: restart the TUI so it resumes with the new turns.
-    if (typeof terminal.closeSession === 'function') {
-      terminal.closeSession(openedTabs.get(sessionId))
-    }
-
-    openedTabs.delete(sessionId)
+    // Chat moved on. A restart cannot help: the Desktop runtime now holds the
+    // session lease and `hermes --tui --resume` refuses a second runtime
+    // (hermes_cli/shared_session_attach.py). Say so instead of pretending.
     staleTabs.delete(sessionId)
+    terminal.setTakeover(true)
+    host.notify({
+      kind: 'info',
+      message:
+        'The chat sent a turn since this TUI opened; the TUI cannot see it until Hermes supports attaching to the running session. Finish this thread in the chat, or start the next one in the TUI.'
+    })
+
+    return
   }
 
   if (!terminal.canOpenSession()) {
