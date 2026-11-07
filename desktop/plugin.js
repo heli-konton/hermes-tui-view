@@ -119,12 +119,18 @@ function backToChat() {
 function toggle(ctx) {
   haptic('tap')
 
-  const terminal = terminalDoor()
+  try {
+    const terminal = terminalDoor()
 
-  if (terminal && terminal.takeover.get()) {
-    backToChat()
-  } else {
-    switchToTui(ctx)
+    if (terminal && terminal.takeover.get()) {
+      backToChat()
+    } else {
+      switchToTui(ctx)
+    }
+  } catch (error) {
+    // A thrown handler would otherwise die silently in the keybind dispatcher.
+    host.notify({ kind: 'error', message: `TUI View: ${error?.message ?? error}` })
+    console.error('[plugin:tui-view] toggle failed', error)
   }
 }
 
@@ -162,12 +168,17 @@ const plugin = {
 
     ctx.onDispose(
       host.state.busy.subscribe(busy => {
-        if (wasBusy && !busy) {
-          const sessionId = host.state.focusedStoredSessionId.get()
+        try {
+          if (wasBusy && !busy) {
+            const sessionId = host.state.focusedStoredSessionId.get()
 
-          if (sessionId && openedTabs.has(sessionId)) {
-            staleTabs.add(sessionId)
+            if (sessionId && openedTabs.has(sessionId)) {
+              staleTabs.add(sessionId)
+            }
           }
+        } catch (error) {
+          // Never let a watcher throw into the app's own store update.
+          console.error('[plugin:tui-view] busy watcher failed', error)
         }
 
         wasBusy = busy
