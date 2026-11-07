@@ -15,6 +15,7 @@ const state = {
   cwd: '/repo',
   takeover: false,
   openCalls: [],
+  closed: [],
   notices: [],
   canOpen: true,
   draft: '',
@@ -45,8 +46,10 @@ register('data:text/javascript,' + encodeURIComponent(`
     export const STATUSBAR_AREAS = { left: 'statusBar.left', right: 'statusBar.right' }
     export const useValue = a => a.get()
     export const haptic = () => {}
+    export const $busy = atom(false)
     export const host = {
       state: {
+        busy: $busy,
         focusedStoredSessionId: ro(() => s.focusedStoredSessionId),
         focusedSessionProfile: ro(() => s.focusedSessionProfile),
         cwd: ro(() => s.cwd)
@@ -55,6 +58,7 @@ register('data:text/javascript,' + encodeURIComponent(`
       composer: { getDraft: async () => s.draft, focus: () => { s.focused = true } },
       terminal: {
         openSession: (id, opts) => { s.openCalls.push({ id, opts }); if (!s.canOpen) return { ok: false, reason: 'no-shell', error: 'no shell' }; $takeover.set(true); return { ok: true, terminalId: 'term-' + s.openCalls.length, command: 'hermes --tui --resume ' + id } },
+        closeSession: id => { s.closed.push(id); return true },
         canOpenSession: () => s.canOpen,
         setTakeover: v => $takeover.set(v),
         takeover: $takeover
@@ -71,6 +75,7 @@ function loadPlugin() {
   const ctx = {
     register: c => contributions.push(c),
     registerMany: cs => contributions.push(...cs),
+    onDispose: () => {},
     os: { writeClipboard: async text => ((state.clipboard = text), true) }
   }
 
@@ -118,6 +123,30 @@ test('toggle opens the focused session in the TUI once, then only flips takeover
   run() // into the TUI again: reuse, no second hermes
   assert.equal(sdk.host.terminal.takeover.get(), true)
   assert.equal(state.openCalls.length, 1)
+})
+
+test('a chat turn completing while the TUI tab exists restarts the tab on the next switch', () => {
+  const { contributions } = loadPlugin()
+  const run = byId(contributions, 'toggle').data.run
+
+  sdk.host.terminal.setTakeover(false)
+  state.openCalls.length = 0
+  state.closed.length = 0
+  state.focusedStoredSessionId = 'sess-9'
+
+  run() // open TUI
+  assert.equal(state.openCalls.length, 1)
+  run() // back to chat
+  sdk.$busy.set(true) // chat turn in flight…
+  sdk.$busy.set(false) // …completes
+  run() // into the TUI again: stale, so restart
+  assert.deepEqual(state.closed, ['term-1'])
+  assert.equal(state.openCalls.length, 2)
+
+  run() // back, no chat turn
+  run() // forward again: plain un-collapse, no restart
+  assert.equal(state.openCalls.length, 2)
+  assert.equal(state.closed.length, 1)
 })
 
 test('refuses politely without a focused session or a shell on the gateway', () => {

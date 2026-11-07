@@ -12,7 +12,10 @@ for Hermes.
   **SSH gateway**, so a remote session resumes on the host that owns it.
 - Toggling back collapses the terminal pane to its rail; the TUI keeps running.
   Toggle again and you are back in it (no second `hermes` is spawned for the
-  same session).
+  same session) — unless the chat view completed a turn meanwhile, in which
+  case the TUI tab is restarted so it resumes with those turns. (The TUI
+  process reads the transcript once at start; TUI → chat syncs live, chat →
+  TUI needs this restart until the TUI can attach to the running gateway.)
 - An unsent draft in the composer is copied to the clipboard when you switch,
   so it comes with you — paste it into the TUI.
 - ⌘K: *TUI View: toggle chat ⇄ TUI*, *TUI View: back to chat*.

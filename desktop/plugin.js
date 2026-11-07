@@ -17,6 +17,13 @@ const ACTION_CHAT = 'tui-view.chat'
  *  toggle reuses the pane instead of stacking another `hermes --tui`. */
 const openedTabs = new Map()
 
+/** Sessions whose CHAT view has completed a turn since their TUI tab opened.
+ *  The TUI process reads the transcript once at resume and nothing feeds it
+ *  afterwards, so the next switch into it restarts the tab instead of showing
+ *  a stale transcript. Turns typed in the TUI never set `host.state.busy`
+ *  (they go through the TUI's own process), so they do not trip this. */
+const staleTabs = new Set()
+
 const terminalDoor = () => (host.terminal && typeof host.terminal.openSession === 'function' ? host.terminal : null)
 
 function notifyWarn(message) {
@@ -57,10 +64,20 @@ function switchToTui(ctx) {
     return
   }
 
-  if (openedTabs.has(sessionId)) {
+  if (openedTabs.has(sessionId) && !staleTabs.has(sessionId)) {
     terminal.setTakeover(true)
 
     return
+  }
+
+  if (openedTabs.has(sessionId)) {
+    // Chat moved on: restart the TUI so it resumes with the new turns.
+    if (typeof terminal.closeSession === 'function') {
+      terminal.closeSession(openedTabs.get(sessionId))
+    }
+
+    openedTabs.delete(sessionId)
+    staleTabs.delete(sessionId)
   }
 
   if (!terminal.canOpenSession()) {
@@ -138,6 +155,25 @@ const plugin = {
   name: 'TUI View',
   description: 'Switch the focused chat between the chat view and the real hermes --tui in the terminal pane — one hotkey, and back.',
   register(ctx) {
+    // A chat turn finishing (busy true → false) while that session has a TUI
+    // tab makes the tab stale. Subscribed during register, so it is retired
+    // with the plugin.
+    let wasBusy = host.state.busy.get()
+
+    ctx.onDispose(
+      host.state.busy.subscribe(busy => {
+        if (wasBusy && !busy) {
+          const sessionId = host.state.focusedStoredSessionId.get()
+
+          if (sessionId && openedTabs.has(sessionId)) {
+            staleTabs.add(sessionId)
+          }
+        }
+
+        wasBusy = busy
+      })
+    )
+
     ctx.registerMany([
       {
         id: 'chip',
