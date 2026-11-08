@@ -17,12 +17,6 @@ const ACTION_CHAT = 'tui-view.chat'
  *  toggle reuses the pane instead of stacking another `hermes --tui`. */
 const openedTabs = new Map()
 
-/** Sessions whose CHAT view has completed a turn since their TUI tab opened.
- *  The TUI process reads the transcript once at resume and nothing feeds it
- *  afterwards, so the next switch into it restarts the tab instead of showing
- *  a stale transcript. Turns typed in the TUI never set `host.state.busy`
- *  (they go through the TUI's own process), so they do not trip this. */
-const staleTabs = new Set()
 
 const terminalDoor = () => (host.terminal && typeof host.terminal.openSession === 'function' ? host.terminal : null)
 
@@ -64,23 +58,8 @@ function switchToTui(ctx) {
     return
   }
 
-  if (openedTabs.has(sessionId) && !staleTabs.has(sessionId)) {
-    terminal.setTakeover(true)
-
-    return
-  }
-
   if (openedTabs.has(sessionId)) {
-    // Chat moved on. A restart cannot help: the Desktop runtime now holds the
-    // session lease and `hermes --tui --resume` refuses a second runtime
-    // (hermes_cli/shared_session_attach.py). Say so instead of pretending.
-    staleTabs.delete(sessionId)
     terminal.setTakeover(true)
-    host.notify({
-      kind: 'info',
-      message:
-        'The chat sent a turn since this TUI opened; the TUI cannot see it until Hermes supports attaching to the running session. Finish this thread in the chat, or start the next one in the TUI.'
-    })
 
     return
   }
@@ -166,30 +145,6 @@ const plugin = {
   name: 'TUI View',
   description: 'Switch the focused chat between the chat view and the real hermes --tui in the terminal pane — one hotkey, and back.',
   register(ctx) {
-    // A chat turn finishing (busy true → false) while that session has a TUI
-    // tab makes the tab stale. Subscribed during register, so it is retired
-    // with the plugin.
-    let wasBusy = host.state.busy.get()
-
-    ctx.onDispose(
-      host.state.busy.subscribe(busy => {
-        try {
-          if (wasBusy && !busy) {
-            const sessionId = host.state.focusedStoredSessionId.get()
-
-            if (sessionId && openedTabs.has(sessionId)) {
-              staleTabs.add(sessionId)
-            }
-          }
-        } catch (error) {
-          // Never let a watcher throw into the app's own store update.
-          console.error('[plugin:tui-view] busy watcher failed', error)
-        }
-
-        wasBusy = busy
-      })
-    )
-
     ctx.registerMany([
       {
         id: 'chip',

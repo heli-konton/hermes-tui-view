@@ -125,33 +125,6 @@ test('toggle opens the focused session in the TUI once, then only flips takeover
   assert.equal(state.openCalls.length, 1)
 })
 
-test('a chat turn completing while the TUI tab exists is reported on the next switch, not restarted', () => {
-  const { contributions } = loadPlugin()
-  const run = byId(contributions, 'toggle').data.run
-
-  sdk.host.terminal.setTakeover(false)
-  state.openCalls.length = 0
-  state.closed.length = 0
-  state.focusedStoredSessionId = 'sess-9'
-
-  run() // open TUI
-  assert.equal(state.openCalls.length, 1)
-  run() // back to chat
-  sdk.$busy.set(true) // chat turn in flight…
-  sdk.$busy.set(false) // …completes
-  state.notices.length = 0
-  run() // into the TUI again: stale — un-collapse and explain, never a second runtime
-  assert.deepEqual(state.closed, [])
-  assert.equal(state.openCalls.length, 1)
-  assert.equal(sdk.host.terminal.takeover.get(), true)
-  assert.match(state.notices.at(-1).message, /cannot see it/)
-
-  run() // back
-  state.notices.length = 0
-  run() // forward again: plain un-collapse, no notice
-  assert.equal(state.notices.length, 0)
-})
-
 test('refuses politely without a focused session or a shell on the gateway', () => {
   const { contributions } = loadPlugin()
   const run = byId(contributions, 'toggle').data.run

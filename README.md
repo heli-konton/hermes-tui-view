@@ -13,16 +13,11 @@ for Hermes.
 - Toggling back collapses the terminal pane to its rail; the TUI keeps running.
   Toggle again and you are back in it (no second `hermes` is spawned for the
   same session).
-- **Sync is one-way for now:** turns typed in the TUI appear live in the chat;
-  a turn sent from the chat is *not* visible in a running TUI (the TUI reads
-  the transcript once, and Hermes' one-owner session lease refuses a second
-  runtime). The plugin tells you when that happened. Rule of thumb: finish a
-  thread in the view you started it in. The real fix is the runtime half of
-  Hermes' cooperative attach (`shared_runtime_url` + `/api/session-attach`),
-  which lets the TUI join the running session — tracked as the follow-up to
-  the SDK PR.
-- An unsent draft in the composer is copied to the clipboard when you switch,
-  so it comes with you — paste it into the TUI.
+- **Two-way live sync** on a runtime with cooperative attach (Hermes with
+  `GET /api/session-attach`): the TUI joins the *same* live session the chat is
+  on, so turns typed in either view appear in the other. On an older runtime the
+  TUI resumes its own copy of the session instead; a turn sent from the chat
+  after that is not visible in the TUI until it is reopened.
 - ⌘K: *TUI View: toggle chat ⇄ TUI*, *TUI View: back to chat*.
 
 ## Requirements
